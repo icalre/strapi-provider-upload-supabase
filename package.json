@@ -14,6 +14,9 @@
     "lib": "./lib"
   },
   "main": "./lib",
+  "scripts": {
+    "build": "tsc"
+  },
   "dependencies": {
     "@supabase/supabase-js": "1.35.5"
   },
