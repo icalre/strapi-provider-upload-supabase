@@ -11,6 +11,7 @@ type TFile = {
     hash: string;
     name: string;
     url: string | null;
+    stream?: any;
 };
 
 type Config = {
@@ -96,17 +97,29 @@ export const init = (config: Config) => {
             file.url = publicURL;
         },
         uploadStream: async (file: TFile, customParams = {}) => {
-            //--- Upload the file into storage
+            if (!file.stream) {
+                return new Error("Missing file stream");
+            }
+
+            const {stream: stream$1} = file;
+            // Convertir el stream a buffer usando async/await
+            const buf = await new Promise<Buffer>((resolve, reject) => {
+                const _buf: Buffer[] = [];
+                stream$1.on("data", (chunk: Buffer) => _buf.push(chunk));
+                stream$1.on("end", () => resolve(Buffer.concat(_buf)));
+                stream$1.on("error", (err: Error) => reject(err));
+            });
+
+            // Subir el archivo al storage
             const {data, error: error1} = await supabase.storage
                 .from(bucket)
                 .upload(
                     getKey({directory, file}),
-                    // file, // or Buffer.from(file.buffer, "binary"),
-                    Buffer.from(file.buffer, "binary"), // or file
+                    buf,
                     {
-                        cacheControl: "public, max-age=31536000, immutable",
+                        cacheControl: 'public, max-age=31536000, immutable',
                         upsert: true,
-                        contentType: file.mime,
+                        contentType: file.mime
                     }
                 );
 
@@ -117,7 +130,9 @@ export const init = (config: Config) => {
                 .getPublicUrl(getKey({directory, file}));
 
             if (error2) throw error2;
+
             file.url = publicURL;
+
         },
         delete: (file: TFile, customParams = {}) =>
             new Promise((resolve, reject) => {
